@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { SwaggerModule } from '@nestjs/swagger';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import * as path from 'path';
 import request from 'supertest';
@@ -10,6 +11,7 @@ import {
   type StartedNetwork,
   type StartedTestContainer,
 } from 'testcontainers';
+import { buildOpenApiDocument } from '../src/docs/build-openapi-document';
 
 jest.setTimeout(240_000);
 
@@ -68,6 +70,7 @@ describe('User API (e2e)', () => {
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
+    SwaggerModule.setup('docs', app, buildOpenApiDocument());
     await app.init();
   });
 
@@ -85,6 +88,26 @@ describe('User API (e2e)', () => {
       .expect(200);
     return response.body as string;
   }
+
+  describe('API Documentation (Swagger UI)', () => {
+    it('serves the interactive docs page', async () => {
+      const response = await request(app.getHttpServer()).get('/docs').expect(200);
+      expect(response.headers['content-type']).toMatch(/text\/html/);
+    });
+
+    it('serves the exact document used to build the page, matching the committed contract', async () => {
+      const response = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      expect(response.body).toEqual(buildOpenApiDocument());
+
+      const protectedPaths = response.body.paths['/user/{username}'];
+      expect(protectedPaths.get.security).toEqual([{ api_key: [] }]);
+      expect(protectedPaths.put.security).toEqual([{ api_key: [] }]);
+      expect(protectedPaths.delete.security).toEqual([{ api_key: [] }]);
+      expect(response.body.paths['/user/logout'].get.security).toEqual([{ api_key: [] }]);
+      expect(response.body.paths['/user'].post.security).toBeUndefined();
+      expect(response.body.paths['/user/login'].get.security).toBeUndefined();
+    });
+  });
 
   describe('User Story 1 — authenticate and receive an API key', () => {
     it('issues an API key for the seeded test account on correct credentials', async () => {

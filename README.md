@@ -36,8 +36,14 @@ This brings up, in order:
 3. `valkey` — the API-key session store, until it reports healthy.
 4. `api` — the NestJS API, once `liquibase` has completed and `valkey` is healthy.
 
-The API is then available at `http://localhost:3000`, with interactive docs at
-`http://localhost:3000/docs` and a health check at `http://localhost:3000/health`.
+The API is then available at `http://localhost:3000`, with a health check at
+`http://localhost:3000/health`.
+
+Interactive API docs are at `http://localhost:3000/docs` — a Swagger UI generated directly from
+the committed contract (`packages/api/swagger/openapi_pet_store.json`), so it's always in sync
+with the real API. It's not just a static reference: use "Try it out" to call any operation for
+real, and "Authorize" to set your `api_key` once and have it applied to every protected call
+afterward. See `specs/003-swagger-ui-docs/quickstart.md` for a walkthrough.
 
 ## 3. The preloaded test account
 

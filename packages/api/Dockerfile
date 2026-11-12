@@ -14,6 +14,7 @@ COPY package.json package-lock.json* tsconfig.base.json ./
 COPY packages/api/package.json packages/api/
 RUN npm ci --omit=dev
 COPY --from=build /workspace/packages/api/dist packages/api/dist
+COPY packages/api/swagger packages/api/swagger
 WORKDIR /workspace/packages/api
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

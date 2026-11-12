@@ -28,7 +28,7 @@ Each package has its own `CLAUDE.md` with stack-specific conventions — read it
 | Spec-driven dev | GitHub Spec Kit (`.specify/`, `speckit-*` skills) |
 
 <!-- SPECKIT START -->
-Active plan: `specs/002-user-api-key-auth/plan.md`.
+Active plan: `specs/003-swagger-ui-docs/plan.md`.
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read that plan (and its
 `research.md` / `data-model.md` / `contracts/` / `quickstart.md` siblings).
