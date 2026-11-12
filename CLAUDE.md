@@ -28,10 +28,9 @@ Each package has its own `CLAUDE.md` with stack-specific conventions — read it
 | Spec-driven dev | GitHub Spec Kit (`.specify/`, `speckit-*` skills) |
 
 <!-- SPECKIT START -->
-Active plan: `specs/004-complete-pet-store-api/plan.md`.
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read that plan (and its
-`research.md` / `data-model.md` / `contracts/` / `quickstart.md` siblings).
+shell commands, and other important information, read the current plan
+at specs/005-mcp-create-pet-tool/plan.md
 <!-- SPECKIT END -->
 
 ## Spec-driven development (Spec Kit)
