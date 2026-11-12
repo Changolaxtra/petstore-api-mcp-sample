@@ -104,6 +104,54 @@ After logout (or expiry), that same key is rejected on any further request.
 See `specs/002-user-api-key-auth/contracts/user-api.md` for the full contract, and
 `specs/002-user-api-key-auth/quickstart.md` for a longer end-to-end walkthrough.
 
+## 6. Managing the pet catalog
+
+Every `pet`-tag operation requires the `api_key` header (same key obtained via `/user/login`
+above):
+
+```sh
+curl -s -X POST http://localhost:3000/pet \
+  -H "api_key: $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"name":"Rex","photoUrls":["https://example.com/rex.jpg"],"category":{"name":"Dogs"},"tags":[{"name":"friendly"}],"status":"available"}'
+
+curl -s "http://localhost:3000/pet/findByStatus?status=available" -H "api_key: $API_KEY"
+curl -s "http://localhost:3000/pet/findByTags?tags=friendly" -H "api_key: $API_KEY"
+
+curl -s -X POST "http://localhost:3000/pet/1/uploadImage" \
+  -H "api_key: $API_KEY" -H 'Content-Type: application/octet-stream' \
+  --data-binary @./rex.jpg
+```
+
+A pet with an order on file can't be deleted (`409`) until that order is removed. See
+`specs/004-complete-pet-store-api/contracts/pet-api.md` for the full contract.
+
+## 7. Placing and managing orders
+
+`store`-tag order operations are open (no `api_key`); the inventory summary requires it:
+
+```sh
+curl -s -X POST http://localhost:3000/store/order \
+  -H 'Content-Type: application/json' -d '{"petId":1,"quantity":1}'
+
+curl -s http://localhost:3000/store/order/1
+curl -s -X DELETE http://localhost:3000/store/order/1
+curl -s http://localhost:3000/store/inventory -H "api_key: $API_KEY"
+```
+
+See `specs/004-complete-pet-store-api/contracts/store-api.md` for the full contract.
+
+## 8. Registering several accounts at once
+
+```sh
+curl -s -X POST http://localhost:3000/user/createWithList \
+  -H 'Content-Type: application/json' \
+  -d '[{"username":"alice","password":"Str0ngPass!23"},{"username":"bob","password":"Str0ngPass!24"}]'
+```
+
+All-or-nothing: if any account in the batch collides with an existing account or with another
+entry in the same batch, the whole batch is rejected (`409`) and none of it is created. See
+`specs/004-complete-pet-store-api/contracts/bulk-user-registration.md` for the full contract.
+
 ## Running tests
 
 ```sh

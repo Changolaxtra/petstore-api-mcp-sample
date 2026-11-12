@@ -109,6 +109,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             },
@@ -172,6 +175,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             }
@@ -237,6 +243,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             }
@@ -299,6 +308,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             }
@@ -425,6 +437,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             },
@@ -436,15 +451,6 @@
                 "description": "Delete a pet.",
                 "operationId": "deletePet",
                 "parameters": [
-                    {
-                        "name": "api_key",
-                        "in": "header",
-                        "description": "",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
                     {
                         "name": "petId",
                         "in": "path",
@@ -473,6 +479,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             }
@@ -543,6 +552,9 @@
                             "write:pets",
                             "read:pets"
                         ]
+                    },
+                    {
+                        "api_key": []
                     }
                 ]
             }

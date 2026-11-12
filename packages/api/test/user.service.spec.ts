@@ -1,8 +1,10 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import type { Kysely } from 'kysely';
+import type { Database } from '../src/database/types';
 import { ApiKeyStoreService } from '../src/security/api-key-store.service';
 import { PasswordHasherService } from '../src/security/password-hasher.service';
 import type { CreateUserDto } from '../src/user/dto/create-user.dto';
-import { UserRepository, type UserRow } from '../src/user/user.repository';
+import { UserRepository, UsernameCollisionError, type UserRow } from '../src/user/user.repository';
 import { UserService } from '../src/user/user.service';
 
 function buildUserRow(overrides: Partial<UserRow> = {}): UserRow {
@@ -32,6 +34,7 @@ describe('UserService', () => {
       findByUsername: jest.fn(),
       findById: jest.fn(),
       create: jest.fn(),
+      createMany: jest.fn(),
       updateByUsername: jest.fn(),
       deleteByUsername: jest.fn(),
     } as unknown as jest.Mocked<UserRepository>;
@@ -72,6 +75,44 @@ describe('UserService', () => {
 
       await expect(service.create(dto)).rejects.toBeInstanceOf(ConflictException);
       expect(repository.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createMany', () => {
+    const dtos: CreateUserDto[] = [
+      { username: 'alice', password: 'Str0ngPass!23' },
+      { username: 'bob', password: 'Str0ngPass!24' },
+    ];
+
+    it('hashes every password and creates the batch when it is clean', async () => {
+      hasher.hash.mockImplementation((password) => Promise.resolve(`hashed-${password}`));
+      repository.createMany.mockResolvedValue([
+        buildUserRow({ username: 'alice' }),
+        buildUserRow({ id: 2, username: 'bob' }),
+      ]);
+
+      const result = await service.createMany(dtos);
+
+      expect(repository.createMany).toHaveBeenCalledWith([
+        expect.objectContaining({ username: 'alice', password: 'hashed-Str0ngPass!23' }),
+        expect.objectContaining({ username: 'bob', password: 'hashed-Str0ngPass!24' }),
+      ]);
+      expect(result).toHaveLength(2);
+    });
+
+    it('maps a batch collision to ConflictException', async () => {
+      hasher.hash.mockResolvedValue('hashed-password');
+      repository.createMany.mockRejectedValue(new UsernameCollisionError('alice'));
+
+      await expect(service.createMany(dtos)).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rethrows an unrelated error', async () => {
+      const error = new Error('connection lost');
+      hasher.hash.mockResolvedValue('hashed-password');
+      repository.createMany.mockRejectedValue(error);
+
+      await expect(service.createMany(dtos)).rejects.toBe(error);
     });
   });
 
@@ -145,5 +186,55 @@ describe('UserService', () => {
       repository.deleteByUsername.mockResolvedValue(false);
       await expect(service.delete('ghost')).rejects.toBeInstanceOf(NotFoundException);
     });
+  });
+});
+
+/**
+ * A maximally permissive fluent-builder mock, mirroring pet.repository.spec.ts: every method
+ * call returns the same proxy except the terminal "execute" family, which resolves to values
+ * that let createMany() proceed past its collision checks. This test only verifies the
+ * transaction-wrapping contract (FR-017) — collision semantics are covered above (mocked
+ * repository) and by the real rollback e2e case.
+ */
+function createFluentMock(): unknown {
+  const handler: ProxyHandler<object> = {
+    get(_target, prop) {
+      if (prop === 'executeTakeFirstOrThrow') {
+        return () => Promise.resolve({});
+      }
+      if (prop === 'executeTakeFirst') {
+        return () => Promise.resolve(undefined);
+      }
+      if (prop === 'execute') {
+        return () => Promise.resolve([]);
+      }
+      return () => proxy;
+    },
+  };
+  const proxy = new Proxy({}, handler);
+  return proxy;
+}
+
+function buildMockedDb(): { db: Kysely<Database>; transactionMock: jest.Mock } {
+  const trx = createFluentMock();
+  const executeMock = jest.fn((callback: (trx: unknown) => unknown) =>
+    Promise.resolve(callback(trx)),
+  );
+  const transactionMock = jest.fn(() => ({ execute: executeMock }));
+  const db = { transaction: transactionMock } as unknown as Kysely<Database>;
+  return { db, transactionMock };
+}
+
+describe('UserRepository.createMany transaction boundary (FR-017)', () => {
+  it('wraps createMany() in exactly one transaction', async () => {
+    const { db, transactionMock } = buildMockedDb();
+    const repository = new UserRepository(db);
+
+    await repository.createMany([
+      { username: 'alice', password: 'hash1' },
+      { username: 'bob', password: 'hash2' },
+    ]);
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });

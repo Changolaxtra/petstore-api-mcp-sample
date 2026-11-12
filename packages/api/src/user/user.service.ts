@@ -8,7 +8,7 @@ import { ApiKeyStoreService } from '../security/api-key-store.service';
 import { PasswordHasherService } from '../security/password-hasher.service';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
-import { UserRepository, type UserRow } from './user.repository';
+import { UsernameCollisionError, UserRepository, type NewUserRow, type UserRow } from './user.repository';
 
 @Injectable()
 export class UserService {
@@ -34,6 +34,30 @@ export class UserService {
       phone: dto.phone ?? null,
       user_status: dto.userStatus ?? null,
     });
+  }
+
+  /** All-or-nothing: a collision anywhere in the batch creates none of it (FR-016). */
+  async createMany(dtos: CreateUserDto[]): Promise<UserRow[]> {
+    const rows: NewUserRow[] = await Promise.all(
+      dtos.map(async (dto) => ({
+        username: dto.username,
+        password: await this.passwordHasher.hash(dto.password),
+        email: dto.email ?? null,
+        first_name: dto.firstName ?? null,
+        last_name: dto.lastName ?? null,
+        phone: dto.phone ?? null,
+        user_status: dto.userStatus ?? null,
+      })),
+    );
+
+    try {
+      return await this.userRepository.createMany(rows);
+    } catch (error) {
+      if (error instanceof UsernameCollisionError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
   }
 
   /** Issues an API key on success. Fails identically for an unknown username or a wrong password (FR-005). */

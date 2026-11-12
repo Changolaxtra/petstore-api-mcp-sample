@@ -27,5 +27,8 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# Uploaded pet images (local disk storage, not source)
+packages/api/uploads/
+
 # Claude Code session-local runtime state
 .claude/scheduled_tasks.lock

@@ -55,6 +55,8 @@ services:
       PORT: ${PORT}
     ports:
       - "${PORT}:${PORT}"
+    volumes:
+      - pet_uploads:/workspace/packages/api/uploads
     healthcheck:
       test:
         [
@@ -67,3 +69,4 @@ services:
 
 volumes:
   postgres_data:
+  pet_uploads:

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,9 +14,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { AuthenticatedRequest } from '../security/api-key.guard';
 import { ApiKeyGuard } from '../security/api-key.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUsersListDto } from './dto/create-users-list.dto';
 import { LoginQueryDto } from './dto/login-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -30,6 +34,21 @@ export class UserController {
   async createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.userService.create(dto);
     return UserResponseDto.fromRow(user);
+  }
+
+  // Body is a raw JSON array per the contract (`createUsersWithListInput`), not an object —
+  // wrapped under `users` here so the existing per-item CreateUserDto validation applies.
+  @Post('createWithList')
+  @HttpCode(HttpStatus.OK)
+  async createUsersWithListInput(@Body() body: unknown): Promise<UserResponseDto[]> {
+    const dto = plainToInstance(CreateUsersListDto, { users: body });
+    const errors = await validate(dto, { whitelist: true });
+    if (errors.length > 0) {
+      throw new BadRequestException('Invalid user list');
+    }
+
+    const users = await this.userService.createMany(dto.users);
+    return users.map(UserResponseDto.fromRow);
   }
 
   @Get('login')

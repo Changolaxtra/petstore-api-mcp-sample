@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { SwaggerModule } from '@nestjs/swagger';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
@@ -68,9 +68,12 @@ describe('User API (e2e)', () => {
     // evaluated, so a static top-of-file import would validate against an
     // empty process.env before beforeAll ever runs.
     const { AppModule } = await import('../src/app.module');
+    const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     SwaggerModule.setup('docs', app, buildOpenApiDocument());
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
   });
 
@@ -218,6 +221,47 @@ describe('User API (e2e)', () => {
         .get(`/user/${SEEDED_USERNAME}`)
         .set('api_key', apiKey)
         .expect(401);
+    });
+  });
+
+  describe('User Story 4 — register several accounts at once', () => {
+    it('creates every account in a non-conflicting batch', async () => {
+      const batch = [
+        { username: 'bulk-user-1', password: 'Str0ngPass!23' },
+        { username: 'bulk-user-2', password: 'Str0ngPass!24' },
+      ];
+
+      const response = await request(app.getHttpServer())
+        .post('/user/createWithList')
+        .send(batch)
+        .expect(200);
+      expect(response.body.map((user: { username: string }) => user.username)).toEqual([
+        'bulk-user-1',
+        'bulk-user-2',
+      ]);
+
+      const apiKey = await login(SEEDED_USERNAME, SEEDED_PASSWORD);
+      for (const { username } of batch) {
+        await request(app.getHttpServer())
+          .get(`/user/${username}`)
+          .set('api_key', apiKey)
+          .expect(200);
+      }
+    });
+
+    it('creates none of a batch containing an internal username collision (FR-016/SC-005)', async () => {
+      const batch = [
+        { username: 'bulk-rollback-1', password: 'Str0ngPass!23' },
+        { username: ' Bulk-Rollback-1 ', password: 'Str0ngPass!24' },
+      ];
+
+      await request(app.getHttpServer()).post('/user/createWithList').send(batch).expect(409);
+
+      const apiKey = await login(SEEDED_USERNAME, SEEDED_PASSWORD);
+      await request(app.getHttpServer())
+        .get('/user/bulk-rollback-1')
+        .set('api_key', apiKey)
+        .expect(404);
     });
   });
 });
